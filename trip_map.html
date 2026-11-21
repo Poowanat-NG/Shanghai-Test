@@ -1,0 +1,1750 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5efe3">
+  <title>China trip map</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.css">
+  <style>
+    :root {
+      --ink: #1f2923;
+      --muted: #68736c;
+      --paper: #fbf8f1;
+      --panel: #fffdf8;
+      --line: #ded8cb;
+      --jade: #176b5b;
+      --jade-dark: #0d4c40;
+      --cinnabar: #c84a32;
+      --amber: #f3d19b;
+      --hotel: #2878a8;
+      --attraction: #d18b22;
+      --shopping: #8659a8;
+      --train-station: #1f7185;
+      --other: #68736c;
+      --shadow: 0 12px 36px rgba(35, 45, 38, .12);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.4;
+    }
+    button, input, select { font: inherit; }
+    button, a, input, select { -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 3px solid #d57a3d; outline-offset: 2px; }
+
+    .app {
+      min-height: 100%;
+      display: grid;
+      grid-template-columns: minmax(340px, 420px) 1fr;
+      grid-template-rows: 1fr;
+    }
+    .panel {
+      min-width: 0;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      position: relative;
+      z-index: 3;
+    }
+    .panel-inner { padding: 24px 22px 28px; }
+    .eyebrow {
+      margin: 0 0 5px;
+      color: var(--cinnabar);
+      font-size: .74rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.8rem, 3vw, 2.45rem);
+      line-height: 1.02;
+      letter-spacing: -.03em;
+    }
+    .intro { margin: 10px 0 15px; color: var(--muted); font-size: .93rem; }
+    .count {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      padding: 7px 11px;
+      border: 1px solid #b9d1c9;
+      border-radius: 999px;
+      color: var(--jade-dark);
+      background: #edf6f2;
+      font-size: .82rem;
+      font-weight: 750;
+    }
+    .count::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--jade); }
+    .add-restaurant {
+      width: 100%;
+      min-height: 48px;
+      margin: 0 0 18px;
+      border: 0;
+      border-radius: 12px;
+      padding: 0 16px;
+      color: white;
+      background: var(--cinnabar);
+      box-shadow: 0 7px 18px rgba(200, 74, 50, .18);
+      cursor: pointer;
+      font-weight: 850;
+    }
+    .add-restaurant:hover { background: #a93624; }
+    .action-stack { display: grid; gap: 9px; margin: 0 0 18px; }
+    .action-stack .add-restaurant { margin: 0; }
+    .sync-restaurant {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid #8eb5a8;
+      border-radius: 12px;
+      padding: 0 16px;
+      color: var(--jade-dark);
+      background: #edf6f2;
+      cursor: pointer;
+      font-weight: 850;
+    }
+    .sync-restaurant:hover { border-color: var(--jade); background: #e1f0ea; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+      margin-bottom: 11px;
+    }
+    .controls .wide { grid-column: 1 / -1; }
+    .field { min-width: 0; }
+    .field label { display: block; margin: 0 0 5px; color: var(--muted); font-size: .77rem; font-weight: 700; }
+    input, select {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      min-height: 46px;
+      border: 1px solid #bdb8ad;
+      border-radius: 10px;
+      padding: 0 12px;
+      color: var(--ink);
+      background: white;
+    }
+    select { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .place-type-multiselect { position: relative; }
+    .place-type-multiselect > label { margin-bottom: 5px; }
+    .place-type-picker {
+      position: relative;
+      width: 100%;
+    }
+    .place-type-picker summary {
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      overflow: hidden;
+      border: 1px solid #bdb8ad;
+      border-radius: 10px;
+      padding: 0 12px;
+      color: var(--ink);
+      background: white;
+      cursor: pointer;
+      list-style: none;
+      font-size: .86rem;
+    }
+    .place-type-picker summary::-webkit-details-marker { display: none; }
+    .place-type-picker summary::after {
+      content: "";
+      flex: 0 0 7px;
+      width: 7px;
+      height: 7px;
+      margin-right: 2px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: translateY(-2px) rotate(45deg);
+    }
+    .place-type-picker[open] summary::after { transform: translateY(2px) rotate(225deg); }
+    .place-type-summary-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .place-type-options {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 6px);
+      left: 0;
+      width: 100%;
+      display: grid;
+      gap: 4px;
+      border: 1px solid #c9c3b7;
+      border-radius: 12px;
+      padding: 8px;
+      background: white;
+      box-shadow: 0 12px 28px rgba(31, 41, 35, .18);
+    }
+    .place-type-option {
+      min-height: 38px;
+      display: flex !important;
+      align-items: center;
+      gap: 9px;
+      margin: 0 !important;
+      border-radius: 8px;
+      padding: 7px 8px;
+      color: var(--ink) !important;
+      cursor: pointer;
+      font-size: .82rem !important;
+    }
+    .place-type-option:hover { background: #edf6f2; }
+    .place-type-option input {
+      width: 18px;
+      min-width: 18px;
+      max-width: 18px;
+      min-height: 18px;
+      margin: 0;
+      accent-color: var(--jade);
+    }
+    .place-type-clear {
+      width: 100%;
+      min-height: 36px;
+      border: 0;
+      border-radius: 8px;
+      color: var(--jade-dark);
+      background: #edf6f2;
+      cursor: pointer;
+      font-weight: 800;
+    }
+    .reset {
+      grid-column: 1 / -1;
+      align-self: end;
+      width: 100%;
+      min-height: 46px;
+      border: 0;
+      border-radius: 10px;
+      padding: 0 14px;
+      color: white;
+      background: var(--jade);
+      cursor: pointer;
+      font-weight: 750;
+    }
+    .reset:hover { background: var(--jade-dark); }
+
+    .results-summary { min-height: 22px; margin: 0 0 9px; color: var(--muted); font-size: .8rem; }
+    .section-title {
+      margin: 18px 0 9px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: .82rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .section-title span { color: var(--muted); font-size: .72rem; letter-spacing: 0; text-transform: none; }
+    .list { display: grid; gap: 8px; }
+    .place {
+      width: 100%;
+      min-height: 56px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      padding: 10px;
+      color: inherit;
+      background: #fff;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .15s, box-shadow .15s, transform .15s;
+    }
+    .place:hover { border-color: #91b2a7; transform: translateY(-1px); }
+    .place[aria-pressed="true"] { border-color: var(--jade); box-shadow: 0 0 0 2px rgba(23, 107, 91, .14); }
+    .place.unresolved { cursor: default; grid-template-columns: 34px minmax(0, 1fr); background: #fcfaf5; }
+    .place.unresolved:hover { border-color: var(--line); transform: none; }
+    .number {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: white;
+      background: var(--jade);
+      font-size: .8rem;
+      font-weight: 850;
+    }
+    .number[data-place-type="hotel"] { background: var(--hotel); }
+    .number[data-place-type="attraction"] { background: var(--attraction); }
+    .number[data-place-type="shopping"] { background: var(--shopping); }
+    .number[data-place-type="train-station"] { background: var(--train-station); }
+    .number[data-place-type="other"] { background: var(--other); }
+    .unresolved .number { color: #6e5431; background: #f4dfbd; }
+    .place-copy { min-width: 0; }
+    .place-name { display: block; overflow-wrap: anywhere; font-size: .92rem; font-weight: 800; }
+    .place-meta { display: block; margin-top: 2px; overflow-wrap: anywhere; color: var(--muted); font-size: .77rem; }
+    .branch {
+      align-self: start;
+      border-radius: 999px;
+      padding: 3px 7px;
+      color: #754615;
+      background: #fff0d8;
+      font-size: .67rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .empty {
+      padding: 22px 12px;
+      border: 1px dashed #bbb3a5;
+      border-radius: 13px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .detail {
+      margin-top: 18px;
+      border: 1px solid #b9d1c9;
+      border-radius: 16px;
+      padding: 16px;
+      background: #f2f8f5;
+      box-shadow: 0 8px 24px rgba(23, 107, 91, .08);
+    }
+    .detail[hidden] { display: none; }
+    .detail-kicker { margin: 0 0 3px; color: var(--jade); font-size: .72rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .detail h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.38rem; line-height: 1.12; }
+    .chinese { margin: 4px 0 13px; font-weight: 750; }
+    .detail-grid { display: grid; grid-template-columns: 92px 1fr; gap: 7px 10px; margin: 0; font-size: .83rem; }
+    .detail-grid dt { color: var(--muted); }
+    .detail-grid dd { margin: 0; overflow-wrap: anywhere; }
+    .note { margin: 13px 0; border-left: 4px solid #dfa34e; padding: 9px 10px; color: #64431d; background: #fff6e6; font-size: .83rem; font-weight: 700; }
+    .correction { border-left-color: var(--cinnabar); color: #6f281d; background: #fff0ec; }
+    .amap-link {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      padding: 0 14px;
+      color: white;
+      background: var(--cinnabar);
+      text-decoration: none;
+      font-weight: 800;
+    }
+    .amap-link:hover { background: #a93624; }
+    .detail-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 12px; }
+    .route-add { min-height: 44px; border: 0; border-radius: 10px; padding: 0 13px; color: white; background: var(--jade); cursor: pointer; font-weight: 800; }
+    .route-add:hover { background: var(--jade-dark); }
+    .delete-local { min-height: 40px; margin-top: 8px; border: 1px solid #d59a8c; border-radius: 9px; padding: 0 12px; color: #8a2f22; background: #fff5f2; cursor: pointer; font-size: .76rem; font-weight: 800; }
+    .delete-local[hidden] { display: none; }
+    .itinerary {
+      margin: 16px 0 2px;
+      border: 1px solid #d7c9b3;
+      border-radius: 16px;
+      padding: 14px;
+      background: #fffaf0;
+    }
+    .itinerary-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .itinerary-head h2 { margin: 0; font: 800 1rem/1.2 Georgia, "Times New Roman", serif; }
+    .route-head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .new-route { min-height: 36px; border: 1px solid #b79b71; border-radius: 9px; padding: 0 10px; color: #60451d; background: white; cursor: pointer; font-size: .76rem; font-weight: 800; }
+    .new-route:hover { background: #fff3dc; }
+    .route-select { margin-top: 10px; min-height: 42px; }
+    .route-help { margin: 8px 0 10px; color: var(--muted); font-size: .72rem; }
+    .route-save-actions { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 7px; margin: 10px 0; }
+    .route-save-actions button { min-height: 40px; border: 1px solid #8ab7aa; border-radius: 9px; padding: 0 9px; color: var(--jade-dark); background: #f4fbf8; cursor: pointer; font-size: .74rem; font-weight: 850; }
+    .route-save-actions button:hover { background: #e7f5f0; }
+    .route-save-actions button:disabled { cursor: wait; opacity: .65; }
+    .route-save-status { min-height: 2.4em; margin: 0 0 10px; color: var(--muted); font-size: .7rem; line-height: 1.35; }
+    .route-save-status.success { color: var(--jade-dark); font-weight: 750; }
+    .route-save-status.error { color: #a93624; font-weight: 750; }
+    .route-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+    .route-stop { display: grid; grid-template-columns: 28px minmax(0,1fr) auto; align-items: center; gap: 8px; border: 1px solid #e2d7c6; border-radius: 10px; padding: 7px; background: white; }
+    .route-order { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--jade); font-size: .72rem; font-weight: 850; }
+    .route-stop-copy { min-width: 0; }
+    .route-stop-name { display: block; overflow-wrap: anywhere; font-size: .8rem; font-weight: 800; }
+    .route-stop-type { display: block; color: var(--muted); font-size: .68rem; }
+    .route-buttons { display: flex; gap: 3px; }
+    .route-buttons button { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; cursor: pointer; font-weight: 850; }
+    .route-empty { margin: 0; border: 1px dashed #cbb99d; border-radius: 10px; padding: 13px; color: var(--muted); text-align: center; font-size: .76rem; }
+    .legend { position: absolute; z-index: 4; left: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 6px 10px; max-width: min(520px, calc(100% - 90px)); border-radius: 11px; padding: 8px 10px; background: rgba(255,253,248,.94); box-shadow: 0 3px 12px rgba(31,41,35,.13); font-size: .68rem; font-weight: 750; }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .legend i { width: 9px; height: 9px; border-radius: 50%; background: var(--cinnabar); }
+    .legend [data-type="hotel"] i { background: var(--hotel); }
+    .legend [data-type="attraction"] i { background: var(--attraction); }
+    .legend [data-type="shopping"] i { background: var(--shopping); }
+    .legend [data-type="train-station"] i { background: var(--train-station); }
+    .legend [data-type="other"] i { background: var(--other); }
+    footer { margin-top: 24px; color: var(--muted); font-size: .72rem; }
+
+    .map-wrap { min-width: 0; min-height: 460px; position: relative; overflow: hidden; background: #dce8e2; }
+    #map { position: absolute; inset: 0; overflow: hidden; background: #dce8e2; }
+    .map-controls { position: absolute; z-index: 4; top: 16px; right: 16px; display: grid; gap: 7px; }
+    .map-control {
+      width: 46px;
+      height: 46px;
+      border: 1px solid rgba(31,41,35,.2);
+      border-radius: 12px;
+      color: var(--ink);
+      background: rgba(255,253,248,.96);
+      box-shadow: 0 4px 14px rgba(31,41,35,.16);
+      cursor: pointer;
+      font-size: 1.3rem;
+      font-weight: 850;
+    }
+    .map-control:hover { background: white; }
+    .tile-message {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      top: 18px;
+      max-width: min(440px, calc(100% - 150px));
+      transform: translateX(-50%);
+      border: 1px solid #d9b47c;
+      border-radius: 12px;
+      padding: 9px 12px;
+      color: #65431f;
+      background: rgba(255,247,232,.96);
+      box-shadow: var(--shadow);
+      text-align: center;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .tile-message[hidden] { display: none; }
+    .tile-message.setup-message {
+      top: 50%;
+      max-width: min(520px, calc(100% - 64px));
+      transform: translate(-50%, -50%);
+      padding: 18px 20px;
+      color: var(--ink);
+      background: rgba(255,253,248,.98);
+      font-size: .92rem;
+      line-height: 1.5;
+    }
+    .map-attribution {
+      position: absolute;
+      z-index: 4;
+      right: 8px;
+      bottom: 8px;
+      border-radius: 5px;
+      padding: 3px 6px;
+      color: #26332d;
+      background: rgba(255,255,255,.9);
+      font-size: .68rem;
+    }
+    .map-attribution a { color: #155c50; }
+    .language-badge {
+      position: absolute;
+      z-index: 4;
+      left: 10px;
+      bottom: 10px;
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: var(--jade-dark);
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 2px 8px rgba(31,41,35,.12);
+      font-size: .7rem;
+      font-weight: 800;
+    }
+    .marker-shell { width: 46px; height: 54px; display: grid; place-items: start center; }
+    .marker-pin {
+      position: relative;
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 3px solid white;
+      border-radius: 50% 50% 50% 8px;
+      color: white;
+      background: var(--cinnabar);
+      box-shadow: 0 5px 14px rgba(31, 41, 35, .32);
+      font: 850 13px/1 ui-sans-serif, sans-serif;
+      transform: rotate(-45deg);
+      cursor: pointer;
+    }
+    .marker-pin span { transform: rotate(45deg); }
+    .marker-pin[data-place-type="hotel"] { background: var(--hotel); }
+    .marker-pin[data-place-type="attraction"] { background: var(--attraction); }
+    .marker-pin[data-place-type="shopping"] { background: var(--shopping); }
+    .marker-pin[data-place-type="train-station"] { background: var(--train-station); }
+    .marker-pin[data-place-type="other"] { background: var(--other); }
+    .marker-pin.is-selected { width: 44px; height: 44px; background: var(--jade-dark); }
+
+    dialog {
+      width: min(620px, calc(100% - 28px));
+      max-height: min(820px, calc(100svh - 28px));
+      overflow: auto;
+      border: 0;
+      border-radius: 20px;
+      padding: 0;
+      color: var(--ink);
+      background: var(--panel);
+      box-shadow: 0 24px 80px rgba(24, 35, 29, .32);
+    }
+    dialog::backdrop { background: rgba(18, 28, 23, .56); backdrop-filter: blur(3px); }
+    .modal-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; padding: 22px 22px 12px; }
+    .modal-head h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.65rem; line-height: 1.08; }
+    .modal-intro { margin: 7px 0 0; color: var(--muted); font-size: .87rem; }
+    .modal-close { width: 42px; height: 42px; flex: none; border: 1px solid var(--line); border-radius: 50%; color: var(--ink); background: white; cursor: pointer; font-size: 1.4rem; }
+    .restaurant-form { display: grid; gap: 13px; padding: 8px 22px 22px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .restaurant-form label { display: block; margin-bottom: 5px; color: var(--muted); font-size: .78rem; font-weight: 750; }
+    .restaurant-form textarea { width: 100%; min-height: 82px; resize: vertical; border: 1px solid #bdb8ad; border-radius: 10px; padding: 10px 12px; color: var(--ink); background: white; font: inherit; }
+    .hint { margin: 5px 0 0; color: var(--muted); font-size: .72rem; }
+    .privacy-note { margin: 0; border-radius: 10px; padding: 10px 12px; color: #53411e; background: #fff5df; font-size: .77rem; }
+    .form-actions { display: flex; align-items: center; gap: 12px; }
+    .submit-restaurant { min-height: 48px; flex: 1; border: 0; border-radius: 11px; padding: 0 16px; color: white; background: var(--jade); cursor: pointer; font-weight: 850; }
+    .submit-restaurant:hover { background: var(--jade-dark); }
+    .submit-restaurant:disabled { opacity: .6; cursor: wait; }
+    .form-status { min-height: 22px; margin: 0; color: var(--muted); font-size: .82rem; font-weight: 700; }
+    .form-status.success { color: var(--jade-dark); }
+    .form-status.error { color: #9d2f20; }
+    .honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+    .mobile-sheet-head, .mobile-dock { display: none; }
+
+    @media (max-width: 760px) {
+      html, body { width: 100%; height: 100%; overflow: hidden; }
+      body { min-height: 100%; overscroll-behavior: none; }
+      .app { display: block; width: 100%; height: 100%; min-height: 0; }
+      .map-wrap { position: fixed; inset: 0; width: 100%; height: 100dvh; min-height: 0; }
+      .panel {
+        position: fixed;
+        z-index: 8;
+        left: 8px;
+        right: 8px;
+        bottom: calc(76px + env(safe-area-inset-bottom));
+        width: auto;
+        height: min(72svh, 680px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        border: 1px solid rgba(31,41,35,.16);
+        border-radius: 22px;
+        background: rgba(255,253,248,.98);
+        box-shadow: 0 18px 48px rgba(24,35,29,.28);
+        transform: translateY(calc(100% + 110px));
+        visibility: hidden;
+        pointer-events: none;
+        transition: transform .24s ease, visibility 0s linear .24s;
+      }
+      .panel.mobile-open {
+        transform: translateY(0);
+        visibility: visible;
+        pointer-events: auto;
+        transition: transform .24s ease;
+      }
+      .panel-inner { padding: 0 14px 24px; }
+      .mobile-sheet-head {
+        position: sticky;
+        z-index: 5;
+        top: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 0 -14px 14px;
+        border-bottom: 1px solid var(--line);
+        padding: 12px 14px 10px;
+        background: rgba(255,253,248,.98);
+        backdrop-filter: blur(12px);
+      }
+      .mobile-sheet-head h2 { margin: 0; font: 800 1.08rem/1.2 Georgia, "Times New Roman", serif; }
+      .mobile-sheet-close { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; color: var(--ink); background: #fff; cursor: pointer; font-size: 1.25rem; }
+      .panel .eyebrow, .panel h1, .panel .intro, .panel .count, .panel .action-stack, .panel footer { display: none; }
+      .panel[data-mobile-panel="search"] .itinerary { display: none; }
+      .panel[data-mobile-panel="route"] .controls,
+      .panel[data-mobile-panel="route"] .results-summary,
+      .panel[data-mobile-panel="route"] #unresolved-section,
+      .panel[data-mobile-panel="route"] #empty { display: none; }
+      .panel[data-mobile-panel="route"] .itinerary { margin-top: 0; }
+      .panel[data-mobile-panel="route"] #mapped-heading::before { content: "Add another place · "; color: var(--ink); }
+      .controls { grid-template-columns: 1fr; }
+      .controls .wide { grid-column: 1; }
+      .reset { grid-column: 1; }
+      .detail { scroll-margin-top: 64px; }
+      .legend { top: 10px; left: 10px; max-width: calc(100% - 78px); gap: 4px 8px; padding: 6px 8px; font-size: .6rem; }
+      .map-controls { top: 10px; right: 10px; }
+      .map-control { width: 42px; height: 42px; }
+      .map-attribution { bottom: calc(72px + env(safe-area-inset-bottom)); max-width: calc(100% - 16px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .language-badge { bottom: calc(72px + env(safe-area-inset-bottom)); }
+      .mobile-dock {
+        position: fixed;
+        z-index: 10;
+        left: 50%;
+        bottom: calc(8px + env(safe-area-inset-bottom));
+        width: min(390px, calc(100% - 16px));
+        min-height: 60px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
+        border: 1px solid rgba(31,41,35,.16);
+        border-radius: 18px;
+        padding: 5px;
+        background: rgba(255,253,248,.96);
+        box-shadow: 0 10px 30px rgba(24,35,29,.26);
+        backdrop-filter: blur(16px);
+        transform: translateX(-50%);
+        transition: width .2s ease;
+      }
+      .mobile-nav-button {
+        min-width: 0;
+        min-height: 50px;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 1px;
+        border: 0;
+        border-radius: 13px;
+        padding: 3px 2px;
+        color: var(--ink);
+        background: transparent;
+        cursor: pointer;
+      }
+      .mobile-nav-button[aria-pressed="true"] { color: white; background: var(--jade); }
+      .mobile-nav-icon { font-size: 1.18rem; line-height: 1; }
+      .mobile-nav-label { overflow: hidden; font-size: .61rem; font-weight: 800; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+      .mobile-dock.map-only { width: 68px; grid-template-columns: 1fr; }
+      .mobile-dock.map-only .mobile-nav-button:not([data-mobile-view="map"]) { display: none; }
+      .tile-message:not(.setup-message) { top: 12px; left: 12px; max-width: calc(100% - 84px); transform: none; text-align: left; }
+      .tile-message.setup-message { left: 50%; max-width: calc(100% - 32px); }
+      .form-grid { grid-template-columns: 1fr; }
+      .modal-head, .restaurant-form { padding-left: 17px; padding-right: 17px; }
+      dialog { max-height: calc(100dvh - 92px); margin-top: 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <aside class="panel" aria-label="China trip guide">
+      <div class="panel-inner">
+        <div class="mobile-sheet-head">
+          <h2 id="mobile-sheet-title">Find a place</h2>
+          <button class="mobile-sheet-close" id="mobile-sheet-close" type="button" aria-label="Close panel">×</button>
+        </div>
+        <p class="eyebrow">Personal trip planner</p>
+        <h1>China trip map</h1>
+        <p class="intro">Keep restaurants, hotels, attractions, train stations, and other trip stops together—then arrange them into a route for each day.</p>
+        <div class="count" id="data-status" aria-live="polite">Loading current place list…</div>
+        <div class="action-stack">
+          <button class="add-restaurant" id="open-add-restaurant" type="button">＋ Add a place</button>
+          <button class="sync-restaurant" id="open-sync" type="button">↻ Research pending now</button>
+        </div>
+
+        <div class="controls" role="search">
+          <div class="field">
+            <label for="search">Find a place</label>
+            <input id="search" type="search" autocomplete="off" placeholder="English or Chinese name">
+          </div>
+          <div class="field">
+            <label for="category">Category</label>
+            <select id="category"><option value="">All categories</option></select>
+          </div>
+          <div class="field wide place-type-multiselect" id="place-type-filter">
+            <label id="place-type-filter-label">Place type</label>
+            <details class="place-type-picker" id="place-type-picker">
+              <summary aria-labelledby="place-type-filter-label place-type-summary"><span class="place-type-summary-text" id="place-type-summary">All place types</span></summary>
+              <div class="place-type-options" role="group" aria-labelledby="place-type-filter-label">
+                <label class="place-type-option"><input name="place-type-filter" type="checkbox" value="Restaurant" aria-label="Restaurants"> Restaurants</label>
+                <label class="place-type-option"><input name="place-type-filter" type="checkbox" value="Hotel" aria-label="Hotels"> Hotels</label>
+                <label class="place-type-option"><input name="place-type-filter" type="checkbox" value="Attraction" aria-label="Attractions"> Attractions</label>
+                <label class="place-type-option"><input name="place-type-filter" type="checkbox" value="Shopping" aria-label="Shopping"> Shopping</label>
+                <label class="place-type-option"><input name="place-type-filter" type="checkbox" value="Train Station" aria-label="Train stations"> Train stations</label>
+                <label class="place-type-option"><input name="place-type-filter" type="checkbox" value="Other" aria-label="Other places"> Other</label>
+                <button class="place-type-clear" id="place-type-clear" type="button">All place types</button>
+              </div>
+            </details>
+          </div>
+          <button class="reset" id="reset" type="button">Show all</button>
+        </div>
+        <p class="results-summary" id="results-summary" aria-live="polite"></p>
+
+        <section class="itinerary" aria-labelledby="itinerary-heading">
+          <div class="itinerary-head">
+            <h2 id="itinerary-heading">Travel route</h2>
+            <div class="route-head-actions">
+              <button class="new-route" id="rename-route" type="button">✎ Rename</button>
+              <button class="new-route" id="new-route" type="button">＋ New list</button>
+            </div>
+          </div>
+          <select class="route-select" id="route-select" aria-label="Current travel route"></select>
+          <p class="route-help">Select a mapped place below, add it to this list, then use the arrows to change the order. The line is a planning guide, not turn-by-turn navigation.</p>
+          <div class="route-save-actions">
+            <button id="save-route-online" type="button">☁ Save shared list</button>
+            <button id="refresh-shared-routes" type="button">↻ Refresh shared list</button>
+          </div>
+          <p class="route-save-status" id="route-save-status" aria-live="polite">Loading the shared trip routes…</p>
+          <ol class="route-list" id="route-list"></ol>
+          <p class="route-empty" id="route-empty">Choose a place and add it to start this route.</p>
+        </section>
+
+        <section class="detail" id="detail" aria-live="polite" hidden>
+          <p class="detail-kicker">Selected place</p>
+          <h2 id="detail-name"></h2>
+          <p class="chinese" id="detail-amap"></p>
+          <dl class="detail-grid">
+            <dt>Area</dt><dd id="detail-area"></dd>
+            <dt>Source category</dt><dd id="detail-category"></dd>
+            <dt>Place type</dt><dd id="detail-type"></dd>
+            <dt>Amap POI</dt><dd id="detail-poi"></dd>
+          </dl>
+          <p class="note" id="detail-note"></p>
+          <a class="amap-link" id="detail-link" target="_blank" rel="noopener noreferrer">Open place source ↗</a>
+          <div class="detail-actions">
+            <select id="detail-route-select" aria-label="Route list for selected place"></select>
+            <button class="route-add" id="add-to-route" type="button">＋ Add to route</button>
+          </div>
+          <button class="delete-local" id="delete-local-place" type="button" hidden>Delete this local place</button>
+        </section>
+
+        <div id="empty" class="empty" hidden>No places match those filters. Try another name or choose “Show all”.</div>
+        <section id="mapped-section" aria-labelledby="mapped-heading">
+          <h2 class="section-title" id="mapped-heading">On the map <span id="mapped-count"></span></h2>
+          <div class="list" id="mapped-list"></div>
+        </section>
+        <section id="unresolved-section" aria-labelledby="unresolved-heading">
+          <h2 class="section-title" id="unresolved-heading">Location needed <span id="unresolved-count"></span></h2>
+          <div class="list" id="unresolved-list"></div>
+        </section>
+
+        <footer>
+          Published places and shared trip routes load from the private editor Sheet. New place suggestions enter its private Pending queue. Every device reads and writes the same Shared Routes tab; the most recent saved change becomes visible to everyone. The free basemap uses OpenFreeMap and OpenStreetMap data; verified place records and source links remain from Amap. Personal trip guide only.
+        </footer>
+      </div>
+    </aside>
+
+    <section class="map-wrap" aria-label="Interactive map of trip places">
+      <div id="map" role="application" tabindex="0" aria-label="Interactive map showing trip places. Use arrow keys to pan and plus or minus to zoom."></div>
+      <div class="legend" aria-label="Pin color legend">
+        <span data-type="restaurant"><i></i>Restaurant</span><span data-type="hotel"><i></i>Hotel</span><span data-type="attraction"><i></i>Attraction</span><span data-type="shopping"><i></i>Shopping</span><span data-type="train-station"><i></i>Train station</span><span data-type="other"><i></i>Other</span>
+      </div>
+      <div class="map-controls" aria-label="Map controls">
+        <button class="map-control" id="zoom-in" type="button" aria-label="Zoom in">+</button>
+        <button class="map-control" id="zoom-out" type="button" aria-label="Zoom out">−</button>
+        <button class="map-control" id="fit-map" type="button" aria-label="Show all visible pins">⌂</button>
+      </div>
+      <div class="tile-message" id="tile-message" role="status" hidden>Map tiles are unavailable. Pins, filters, place details, and source links still work.</div>
+    </section>
+  </main>
+
+  <nav class="mobile-dock" id="mobile-dock" aria-label="Mobile map actions">
+    <button class="mobile-nav-button" id="mobile-map-action" data-mobile-view="map" type="button" aria-pressed="false">
+      <span class="mobile-nav-icon" aria-hidden="true">⌖</span><span class="mobile-nav-label">Map</span>
+    </button>
+    <button class="mobile-nav-button" id="mobile-find-action" data-mobile-view="search" type="button" aria-pressed="false">
+      <span class="mobile-nav-icon" aria-hidden="true">⌕</span><span class="mobile-nav-label">Find</span>
+    </button>
+    <button class="mobile-nav-button" id="mobile-add-action" data-mobile-view="add" type="button" aria-pressed="false">
+      <span class="mobile-nav-icon" aria-hidden="true">＋</span><span class="mobile-nav-label">Add place</span>
+    </button>
+    <button class="mobile-nav-button" id="mobile-route-action" data-mobile-view="route" type="button" aria-pressed="false">
+      <span class="mobile-nav-icon" aria-hidden="true">≋</span><span class="mobile-nav-label">Routes</span>
+    </button>
+  </nav>
+
+  <dialog id="add-dialog" aria-labelledby="add-title">
+    <div class="modal-head">
+      <div>
+        <h2 id="add-title">Add a place</h2>
+        <p class="modal-intro">Add any place in China. It enters the private Sheet as Pending and stays unpublished until research confirms the exact location.</p>
+      </div>
+      <button class="modal-close" id="close-add-dialog" type="button" aria-label="Close">×</button>
+    </div>
+    <form class="restaurant-form" id="restaurant-form">
+      <div class="form-grid">
+        <div>
+          <label for="add-name">Place name *</label>
+          <input id="add-name" name="name" required maxlength="120" autocomplete="organization" placeholder="e.g. Humble Administrator's Garden">
+        </div>
+        <div>
+          <label for="add-place-type">Place type *</label>
+          <select id="add-place-type" name="placeType" required>
+            <option value="Restaurant">Restaurant</option><option value="Hotel">Hotel</option><option value="Attraction">Attraction</option><option value="Shopping">Shopping</option><option value="Train Station">Train Station</option><option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div>
+          <label id="add-category-label" for="add-category">Category or description *</label>
+          <input id="add-category" name="category" required maxlength="80" list="restaurant-types" placeholder="e.g. Hotel, museum, bakery">
+          <select id="add-train-category" name="category" required disabled hidden>
+            <option value="">Choose a train category</option>
+            <option value="Subway">Subway</option>
+            <option value="Express Train">Express Train</option>
+          </select>
+          <datalist id="restaurant-types"></datalist>
+          <p class="hint" id="add-category-hint" hidden>Choose Subway for metro stations or Express Train for intercity and high-speed rail stations.</p>
+      </div>
+      <div>
+        <label for="add-area">Branch, neighborhood, or address</label>
+        <input id="add-area" name="areaBranch" maxlength="160" placeholder="e.g. Suzhou · Gusu District · Dongbei Street">
+        <p class="hint">This greatly improves exact-branch matching.</p>
+      </div>
+      <div>
+        <label for="add-map-link">Amap link (recommended) or Google Maps link</label>
+        <input id="add-map-link" name="mapLink" type="url" maxlength="500" inputmode="url" placeholder="https://…">
+        <p class="hint">For the most reliable pin, paste the exact Amap place/share link.</p>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label for="add-latitude">Latitude (optional)</label>
+          <input id="add-latitude" name="latitude" type="number" min="18" max="54" step="any" inputmode="decimal" placeholder="31.3242">
+        </div>
+        <div>
+          <label for="add-longitude">Longitude (optional)</label>
+          <input id="add-longitude" name="longitude" type="number" min="73" max="135" step="any" inputmode="decimal" placeholder="120.6252">
+        </div>
+      </div>
+      <div>
+        <label for="add-coordinate-system">Coordinate system</label>
+        <select id="add-coordinate-system" name="coordinateSystem">
+          <option value="GCJ-02">GCJ-02 — copied from Amap</option>
+          <option value="WGS84">WGS84 — Google Maps; requires Amap review</option>
+        </select>
+      </div>
+      <div>
+        <label for="add-note">Optional note</label>
+        <textarea id="add-note" name="note" maxlength="300" placeholder="What you want to try, a branch clue, or who recommended it"></textarea>
+      </div>
+      <div class="honeypot" aria-hidden="true">
+        <label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off">
+      </div>
+      <p class="privacy-note">This saves a private Pending row in Google Sheets. It does not publish the place or call AI until you run research.</p>
+      <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+      <div class="form-actions">
+        <button class="submit-restaurant" id="submit-restaurant" type="submit">Save as Pending</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="sync-dialog" aria-labelledby="sync-title">
+    <div class="modal-head">
+      <div>
+        <h2 id="sync-title">Research pending places</h2>
+        <p class="modal-intro">Starts the same AI research and Amap verification used by the nightly job for restaurants, hotels, attractions, shopping, train stations, and other places. It processes Pending or Retry rows anywhere in China.</p>
+      </div>
+      <button class="modal-close" id="close-sync-dialog" type="button" aria-label="Close">×</button>
+    </div>
+    <form class="restaurant-form" id="sync-form">
+      <div>
+        <label for="sync-passcode">Owner passcode *</label>
+        <input id="sync-passcode" name="passcode" type="password" required maxlength="80" autocomplete="current-password" placeholder="Private map passcode">
+      </div>
+      <p class="privacy-note">If nothing is waiting, the check stops before OpenAI is called, so the paid-call count stays at zero.</p>
+      <p class="form-status" id="sync-status" role="status" aria-live="polite"></p>
+      <div class="form-actions">
+        <button class="submit-restaurant" id="start-sync" type="submit">Start research now</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="config.js"></script>
+  <script>
+    "use strict";
+
+    const MAPLIBRE_MODULE_URL = "https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.mjs";
+    const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+    const DATA_API_URL = String(window.TRIP_MAP_CONFIG?.dataApiUrl || "").trim();
+    const DATA_API_READY = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(DATA_API_URL);
+    const DATA_CACHE_KEY = "trip-map-data-v1";
+    const CAN_REQUEST_TILES = location.protocol === "http:" || location.protocol === "https:";
+    const FORCE_FALLBACK_TEST = ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).get("data") === "fallback";
+
+    // Empty by design. Published places load from your own Google Sheet.
+    const FALLBACK_RESTAURANTS = [];
+    let RESTAURANTS = FALLBACK_RESTAURANTS.map((restaurant) => ({ ...restaurant }));
+    const LOCAL_PLACES_KEY = "trip-map-local-places-v1";
+    const ROUTES_KEY = "trip-map-routes-v1";
+    const PLACE_TYPES = ["Restaurant", "Hotel", "Attraction", "Shopping", "Train Station", "Other"];
+    let routes = readJson(ROUTES_KEY, [{ id: "day-1", name: "Day 1", stops: [] }]);
+    let activeRouteId = routes[0]?.id || "day-1";
+    let routesDirty = false;
+    let sharedRoutesUpdatedAt = "";
+
+    const ui = {
+      search: document.getElementById("search"), category: document.getElementById("category"),
+      placeTypeFilter: document.getElementById("place-type-filter"),
+      placeTypePicker: document.getElementById("place-type-picker"),
+      placeTypeSummary: document.getElementById("place-type-summary"),
+      placeTypeClear: document.getElementById("place-type-clear"),
+      placeTypeOptions: [...document.querySelectorAll('input[name="place-type-filter"]')],
+      reset: document.getElementById("reset"), summary: document.getElementById("results-summary"),
+      mappedList: document.getElementById("mapped-list"), unresolvedList: document.getElementById("unresolved-list"),
+      mappedSection: document.getElementById("mapped-section"), unresolvedSection: document.getElementById("unresolved-section"),
+      mappedCount: document.getElementById("mapped-count"), unresolvedCount: document.getElementById("unresolved-count"),
+      empty: document.getElementById("empty"), detail: document.getElementById("detail"),
+      detailName: document.getElementById("detail-name"), detailAmap: document.getElementById("detail-amap"),
+      detailArea: document.getElementById("detail-area"), detailCategory: document.getElementById("detail-category"),
+      detailType: document.getElementById("detail-type"), detailRouteSelect: document.getElementById("detail-route-select"),
+      addToRoute: document.getElementById("add-to-route"), routeSelect: document.getElementById("route-select"),
+      deleteLocalPlace: document.getElementById("delete-local-place"),
+      routeList: document.getElementById("route-list"), routeEmpty: document.getElementById("route-empty"),
+      newRoute: document.getElementById("new-route"), renameRoute: document.getElementById("rename-route"),
+      saveRouteOnline: document.getElementById("save-route-online"),
+      refreshSharedRoutes: document.getElementById("refresh-shared-routes"), routeSaveStatus: document.getElementById("route-save-status"),
+      detailPoi: document.getElementById("detail-poi"), detailNote: document.getElementById("detail-note"),
+      detailLink: document.getElementById("detail-link"), map: document.getElementById("map"),
+      tileMessage: document.getElementById("tile-message"), zoomIn: document.getElementById("zoom-in"),
+      zoomOut: document.getElementById("zoom-out"), fitMap: document.getElementById("fit-map"),
+      dataStatus: document.getElementById("data-status"), openAdd: document.getElementById("open-add-restaurant"),
+      addDialog: document.getElementById("add-dialog"), closeAdd: document.getElementById("close-add-dialog"),
+      restaurantForm: document.getElementById("restaurant-form"), formStatus: document.getElementById("form-status"),
+      submitRestaurant: document.getElementById("submit-restaurant"), restaurantTypes: document.getElementById("restaurant-types"),
+      addPlaceType: document.getElementById("add-place-type"), addCategory: document.getElementById("add-category"),
+      addTrainCategory: document.getElementById("add-train-category"), addCategoryLabel: document.getElementById("add-category-label"),
+      addCategoryHint: document.getElementById("add-category-hint"),
+      openSync: document.getElementById("open-sync"), syncDialog: document.getElementById("sync-dialog"),
+      closeSync: document.getElementById("close-sync-dialog"), syncForm: document.getElementById("sync-form"),
+      syncStatus: document.getElementById("sync-status"), startSync: document.getElementById("start-sync"),
+      panel: document.querySelector(".panel"), mobileDock: document.getElementById("mobile-dock"),
+      mobileSheetTitle: document.getElementById("mobile-sheet-title"), mobileSheetClose: document.getElementById("mobile-sheet-close"),
+      mobileMapAction: document.getElementById("mobile-map-action"), mobileFindAction: document.getElementById("mobile-find-action"),
+      mobileAddAction: document.getElementById("mobile-add-action"), mobileRouteAction: document.getElementById("mobile-route-action")
+    };
+
+    let selectedId = null;
+    let map = null;
+    let MapLibreApi = null;
+    const markers = new Map();
+    const mobileLayout = window.matchMedia("(max-width: 760px)");
+
+    function setMobileActionState(activeView = "") {
+      [ui.mobileMapAction, ui.mobileFindAction, ui.mobileAddAction, ui.mobileRouteAction].forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.mobileView === activeView));
+      });
+    }
+
+    function closeMobilePanel() {
+      ui.panel.classList.remove("mobile-open");
+      delete ui.panel.dataset.mobilePanel;
+      setMobileActionState("");
+      window.setTimeout(() => map?.resize(), 260);
+    }
+
+    function openMobilePanel(view) {
+      if (!mobileLayout.matches) return;
+      ui.mobileDock.classList.remove("map-only");
+      ui.mobileMapAction.querySelector(".mobile-nav-label").textContent = "Map";
+      ui.panel.dataset.mobilePanel = view;
+      ui.mobileSheetTitle.textContent = view === "route" ? "Saved routes" : "Find a place";
+      ui.panel.classList.add("mobile-open");
+      setMobileActionState(view);
+      ui.panel.scrollTop = 0;
+      if (view === "search") window.setTimeout(() => ui.search.focus({ preventScroll: true }), 260);
+    }
+
+    function toggleMobileMapMode() {
+      if (!mobileLayout.matches) return;
+      if (ui.mobileDock.classList.contains("map-only")) {
+        ui.mobileDock.classList.remove("map-only");
+        ui.mobileMapAction.querySelector(".mobile-nav-label").textContent = "Map";
+        setMobileActionState("");
+        return;
+      }
+      closeMobilePanel();
+      ui.mobileDock.classList.add("map-only");
+      ui.mobileMapAction.querySelector(".mobile-nav-label").textContent = "Menu";
+      setMobileActionState("map");
+    }
+
+    function resetMobileLayout() {
+      if (mobileLayout.matches) return;
+      ui.panel.classList.remove("mobile-open");
+      delete ui.panel.dataset.mobilePanel;
+      ui.mobileDock.classList.remove("map-only");
+      ui.mobileMapAction.querySelector(".mobile-nav-label").textContent = "Map";
+      setMobileActionState("");
+      window.setTimeout(() => map?.resize(), 0);
+    }
+
+    function readJson(key, fallback) {
+      try {
+        const value = JSON.parse(localStorage.getItem(key) || "null");
+        return value ?? fallback;
+      } catch (_) { return fallback; }
+    }
+
+    const placeType = (r) => PLACE_TYPES.includes(r.place_type) ? r.place_type : "Restaurant";
+    const placeTypeKey = (r) => placeType(r).toLowerCase().replace(/\s+/g, "-");
+    const normalizedPlace = (r) => ({ ...r, place_type: placeType(r) });
+
+    function mergeLocalPlaces() {
+      const localPlaces = readJson(LOCAL_PLACES_KEY, []);
+      if (Array.isArray(localPlaces)) RESTAURANTS.push(...localPlaces.filter(validRestaurant).map(normalizedPlace));
+    }
+
+    function validRestaurant(r) {
+      return r && typeof r === "object" && String(r.id || "").trim() && String(r.restaurant_from_doc || "").trim();
+    }
+
+    function readCachedRestaurants() {
+      try {
+        const cached = JSON.parse(localStorage.getItem(DATA_CACHE_KEY) || "null");
+        return Array.isArray(cached?.restaurants) && cached.restaurants.every(validRestaurant) ? cached : null;
+      } catch (_) { return null; }
+    }
+
+    function requireDataApi() {
+      if (!DATA_API_READY) {
+        throw new Error("Setup needed: paste your deployed Apps Script Web App URL into config.js.");
+      }
+    }
+
+    async function loadRestaurantData() {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6500);
+      try {
+        requireDataApi();
+        if (FORCE_FALLBACK_TEST) throw new Error("Local fallback test requested");
+        const response = await fetch(`${DATA_API_URL}?v=${Date.now()}`, { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error(`Restaurant data request failed (${response.status})`);
+        const payload = await response.json();
+        if (!Array.isArray(payload.restaurants) || !payload.restaurants.every(validRestaurant)) {
+          throw new Error("Restaurant data response was incomplete");
+        }
+        RESTAURANTS = payload.restaurants.map(normalizedPlace);
+        localStorage.setItem(DATA_CACHE_KEY, JSON.stringify({ restaurants: RESTAURANTS, updatedAt: payload.updatedAt || new Date().toISOString() }));
+        return "Live from Google Sheet";
+      } catch (error) {
+        console.warn("Live restaurant data unavailable; using a saved copy.", error);
+        const cached = readCachedRestaurants();
+        if (cached) {
+          RESTAURANTS = cached.restaurants.map(normalizedPlace);
+          return "Saved copy";
+        }
+        RESTAURANTS = FALLBACK_RESTAURANTS.map(normalizedPlace);
+        return DATA_API_READY ? "No saved places available" : "Setup needed: add Apps Script URL in config.js";
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    function updateDataStatus(source) {
+      const mapped = RESTAURANTS.filter(hasCoordinates).length;
+      const unresolved = RESTAURANTS.length - mapped;
+      ui.dataStatus.textContent = unresolved
+        ? `${mapped} mapped · ${unresolved} need a location · ${source}`
+        : `${mapped} mapped places · ${source}`;
+    }
+
+    const hasCoordinates = (r) => Number.isFinite(Number(r.latitude_gcj02)) && Number.isFinite(Number(r.longitude_gcj02)) && r.latitude_gcj02 !== "" && r.longitude_gcj02 !== "";
+    const safePlaceUrl = (value) => {
+      try {
+        const url = new URL(value);
+        const isAmap = ["www.amap.com", "amap.com"].includes(url.hostname) && (url.pathname.startsWith("/place/") || url.pathname.startsWith("/ssr/place/"));
+        const isGoogleMaps = ["maps.google.com", "www.google.com", "google.com"].includes(url.hostname) && (url.hostname === "maps.google.com" || url.pathname.startsWith("/maps"));
+        return url.protocol === "https:" && (isAmap || isGoogleMaps) ? url.href : "";
+      } catch (_) { return ""; }
+    };
+    const safeAmapUrl = safePlaceUrl;
+    const isSuggested = (r) => r.match_note.toLowerCase().includes("suggested branch");
+    const selectedPlaceTypes = () => new Set(ui.placeTypeOptions.filter((option) => option.checked).map((option) => option.value));
+    const placeTypeLabels = {
+      Restaurant: "Restaurants", Hotel: "Hotels", Attraction: "Attractions",
+      Shopping: "Shopping", "Train Station": "Train stations", Other: "Other"
+    };
+    function updatePlaceTypeSummary() {
+      const selected = [...selectedPlaceTypes()];
+      ui.placeTypeSummary.textContent = !selected.length
+        ? "All place types"
+        : selected.length <= 2
+          ? selected.map((type) => placeTypeLabels[type]).join(" + ")
+          : `${selected.length} place types selected`;
+    }
+    function clearPlaceTypeFilters({ close = true } = {}) {
+      ui.placeTypeOptions.forEach((option) => { option.checked = false; });
+      updatePlaceTypeSummary();
+      if (close) ui.placeTypePicker.open = false;
+    }
+    const currentMatches = () => {
+      const query = ui.search.value.trim().toLocaleLowerCase();
+      const category = ui.category.value;
+      const types = selectedPlaceTypes();
+      return RESTAURANTS.filter((r) => {
+        const names = `${r.restaurant_from_doc} ${r.amap_place}`.toLocaleLowerCase();
+        return (!query || names.includes(query)) && (!category || r.type_from_doc === category) && (!types.size || types.has(placeType(r)));
+      });
+    };
+
+    function makePlaceButton(r, located) {
+      const el = document.createElement(located ? "button" : "div");
+      el.className = `place${located ? "" : " unresolved"}`;
+      if (located) {
+        el.type = "button";
+        el.dataset.id = r.id;
+        el.setAttribute("aria-pressed", String(selectedId === r.id));
+        el.setAttribute("aria-label", `Select ${r.restaurant_from_doc}, map marker ${r.id}`);
+        el.addEventListener("click", () => {
+          selectRestaurant(r.id, true);
+          if (mobileLayout.matches) window.setTimeout(() => ui.detail.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
+        });
+      }
+      const number = document.createElement("span");
+      number.className = "number";
+      number.dataset.placeType = placeTypeKey(r);
+      number.textContent = r.id;
+      number.setAttribute("aria-hidden", "true");
+      const copy = document.createElement("span");
+      copy.className = "place-copy";
+      const name = document.createElement("span");
+      name.className = "place-name";
+      name.textContent = r.restaurant_from_doc;
+      const meta = document.createElement("span");
+      meta.className = "place-meta";
+      meta.textContent = located ? `${placeType(r)} · ${r.amap_place || r.area} · ${r.type_from_doc}` : `${placeType(r)} · ${r.type_from_doc} · ${r.match_note}`;
+      copy.append(name, meta);
+      el.append(number, copy);
+      if (located && isSuggested(r)) {
+        const badge = document.createElement("span");
+        badge.className = "branch";
+        badge.textContent = "Suggested";
+        el.append(badge);
+      }
+      return el;
+    }
+
+    function renderList() {
+      const matches = currentMatches();
+      const mapped = matches.filter(hasCoordinates);
+      const unresolved = matches.filter((r) => !hasCoordinates(r));
+      ui.mappedList.replaceChildren(...mapped.map((r) => makePlaceButton(r, true)));
+      ui.unresolvedList.replaceChildren(...unresolved.map((r) => makePlaceButton(r, false)));
+      ui.mappedCount.textContent = `${mapped.length} shown`;
+      ui.unresolvedCount.textContent = `${unresolved.length} shown`;
+      ui.mappedSection.hidden = mapped.length === 0;
+      ui.unresolvedSection.hidden = unresolved.length === 0;
+      ui.empty.hidden = matches.length !== 0;
+      ui.summary.textContent = `${matches.length} of ${RESTAURANTS.length} places · ${mapped.length} pins visible`;
+      updateMapMarkers(new Set(mapped.map((r) => r.id)));
+      if (selectedId && !matches.some((r) => r.id === selectedId)) clearSelection();
+    }
+
+    function showDetails(r) {
+      ui.detail.hidden = false;
+      ui.detailName.textContent = `${r.id}. ${r.restaurant_from_doc}`;
+      ui.detailAmap.textContent = r.amap_place || "Amap place not resolved";
+      ui.detailArea.textContent = r.area || "Location needed";
+      ui.detailCategory.textContent = r.type_from_doc;
+      ui.detailType.textContent = placeType(r);
+      ui.detailPoi.textContent = r.amap_poi_id || "Not available";
+      ui.detailNote.textContent = r.id === "15" ? `Correction: ${r.match_note}. The source category “${r.type_from_doc}” is retained for traceability.` : r.match_note;
+      ui.detailNote.classList.toggle("correction", r.id === "15");
+      const url = safePlaceUrl(r.amap_url);
+      ui.detailLink.hidden = !url;
+      if (url) ui.detailLink.href = url;
+      ui.addToRoute.disabled = !hasCoordinates(r);
+      ui.deleteLocalPlace.hidden = !String(r.id).startsWith("L");
+    }
+
+    function saveRoutes() {
+      localStorage.setItem(ROUTES_KEY, JSON.stringify(routes));
+      routesDirty = true;
+      setRouteSaveStatus("Unsaved changes on this device. Select “Save shared list” to update every device.");
+    }
+
+    function setRouteSaveStatus(message, kind = "") {
+      ui.routeSaveStatus.textContent = message;
+      ui.routeSaveStatus.className = `route-save-status${kind ? ` ${kind}` : ""}`;
+    }
+
+    async function loadSharedRoutes({ force = false } = {}) {
+      if (force && routesDirty && !window.confirm("Discard unsaved route changes and reload the shared list?")) return;
+      ui.refreshSharedRoutes.disabled = true;
+      ui.refreshSharedRoutes.textContent = "Refreshing…";
+      setRouteSaveStatus("Loading the shared trip routes…");
+      try {
+        requireDataApi();
+        const url = new URL(DATA_API_URL);
+        url.searchParams.set("action", "shared_routes");
+        url.searchParams.set("v", Date.now());
+        const response = await fetch(url.toString(), { redirect: "follow", cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || "The shared route list could not be loaded.");
+        routes = result.routes;
+        if (!routes.some((route) => route.id === activeRouteId)) activeRouteId = routes[0]?.id || "day-1";
+        routesDirty = false;
+        sharedRoutesUpdatedAt = result.updatedAt || "";
+        localStorage.setItem(ROUTES_KEY, JSON.stringify(routes));
+        renderRoute();
+        setRouteSaveStatus("Shared routes loaded from Google Sheets. Every device uses this list.", "success");
+      } catch (error) {
+        console.warn("Shared routes could not be loaded:", error.message || error);
+        setRouteSaveStatus(error.message || "The shared route list could not be loaded.", "error");
+      } finally {
+        ui.refreshSharedRoutes.disabled = false;
+        ui.refreshSharedRoutes.textContent = "↻ Refresh shared list";
+      }
+    }
+
+    async function saveSharedRoutes() {
+      ui.saveRouteOnline.disabled = true;
+      ui.saveRouteOnline.textContent = "Saving…";
+      setRouteSaveStatus("Saving the shared list to Google Sheets…");
+      const payload = {
+        action: "save_shared_routes",
+        routes,
+        website: ""
+      };
+      try {
+        requireDataApi();
+        const response = await fetch(DATA_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
+          body: JSON.stringify(payload),
+          redirect: "follow"
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || "The shared route list could not be saved.");
+        routesDirty = false;
+        sharedRoutesUpdatedAt = result.updatedAt || "";
+        localStorage.setItem(ROUTES_KEY, JSON.stringify(routes));
+        setRouteSaveStatus("Shared list saved. Phone, computer, and every visitor now use this version.", "success");
+        ui.saveRouteOnline.textContent = "✓ Shared list saved";
+      } catch (error) {
+        console.warn("Shared route save failed:", error.message || error);
+        setRouteSaveStatus(error.message || "The shared route list could not be saved. Please try again.", "error");
+        ui.saveRouteOnline.textContent = "Try saving again";
+      } finally {
+        ui.saveRouteOnline.disabled = false;
+      }
+    }
+
+    function currentRoute() {
+      return routes.find((route) => route.id === activeRouteId) || routes[0];
+    }
+
+    function refreshRouteSelectors() {
+      const options = routes.map((route) => new Option(route.name, route.id));
+      ui.routeSelect.replaceChildren(...options.map((option) => option.cloneNode(true)));
+      ui.detailRouteSelect.replaceChildren(...options.map((option) => option.cloneNode(true)));
+      ui.routeSelect.value = activeRouteId;
+      ui.detailRouteSelect.value = activeRouteId;
+    }
+
+    function routeCoordinates() {
+      const route = currentRoute();
+      if (!route) return [];
+      return route.stops.map((id) => markers.get(id)).filter(Boolean).map((marker) => [marker.lng, marker.lat]);
+    }
+
+    function updateRouteLine() {
+      if (!map?.getSource("trip-route")) return;
+      const coordinates = routeCoordinates();
+      map.getSource("trip-route").setData({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "LineString", coordinates: coordinates.length > 1 ? coordinates : [] }
+      });
+    }
+
+    function moveRouteStop(index, change) {
+      const route = currentRoute();
+      const nextIndex = index + change;
+      if (!route || nextIndex < 0 || nextIndex >= route.stops.length) return;
+      [route.stops[index], route.stops[nextIndex]] = [route.stops[nextIndex], route.stops[index]];
+      saveRoutes();
+      renderRoute();
+    }
+
+    function removeRouteStop(index) {
+      const route = currentRoute();
+      if (!route) return;
+      route.stops.splice(index, 1);
+      saveRoutes();
+      renderRoute();
+    }
+
+    function renderRoute() {
+      refreshRouteSelectors();
+      const route = currentRoute();
+      const stops = route?.stops.map((id) => RESTAURANTS.find((place) => place.id === id)).filter(Boolean) || [];
+      ui.routeEmpty.hidden = stops.length > 0;
+      ui.routeList.replaceChildren(...stops.map((place, index) => {
+        const item = document.createElement("li");
+        item.className = "route-stop";
+        const order = document.createElement("span");
+        order.className = "route-order";
+        order.textContent = String(index + 1);
+        const copy = document.createElement("span");
+        copy.className = "route-stop-copy";
+        const name = document.createElement("span");
+        name.className = "route-stop-name";
+        name.textContent = place.restaurant_from_doc;
+        const type = document.createElement("span");
+        type.className = "route-stop-type";
+        type.textContent = placeType(place);
+        copy.append(name, type);
+        const buttons = document.createElement("span");
+        buttons.className = "route-buttons";
+        [["↑", -1, "Move earlier"], ["↓", 1, "Move later"]].forEach(([label, change, aria]) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = label;
+          button.setAttribute("aria-label", `${aria}: ${place.restaurant_from_doc}`);
+          button.disabled = (change === -1 && index === 0) || (change === 1 && index === stops.length - 1);
+          button.addEventListener("click", () => moveRouteStop(index, change));
+          buttons.append(button);
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", `Remove ${place.restaurant_from_doc} from route`);
+        remove.addEventListener("click", () => removeRouteStop(index));
+        buttons.append(remove);
+        item.append(order, copy, buttons);
+        return item;
+      }));
+      updateRouteLine();
+    }
+
+    function addSelectedToRoute() {
+      const routeId = ui.detailRouteSelect.value;
+      const route = routes.find((item) => item.id === routeId);
+      if (!route || !selectedId) return;
+      activeRouteId = routeId;
+      if (!route.stops.includes(selectedId)) route.stops.push(selectedId);
+      saveRoutes();
+      renderRoute();
+    }
+
+    function createRouteList() {
+      const defaultName = `Day ${routes.length + 1}`;
+      const name = window.prompt("Name this route list", defaultName)?.trim();
+      if (!name) return;
+      const id = `route-${Date.now()}`;
+      routes.push({ id, name: name.slice(0, 40), stops: [] });
+      activeRouteId = id;
+      saveRoutes();
+      renderRoute();
+    }
+
+    function renameRouteList() {
+      const route = currentRoute();
+      if (!route) return;
+      const name = window.prompt("Rename this route list", route.name)?.trim();
+      if (!name || name === route.name) return;
+      route.name = name.slice(0, 40);
+      saveRoutes();
+      renderRoute();
+      ui.routeSelect.focus();
+    }
+
+    function deleteSelectedLocalPlace() {
+      if (!selectedId?.startsWith("L")) return;
+      const place = RESTAURANTS.find((item) => item.id === selectedId);
+      if (!place || !window.confirm(`Delete ${place.restaurant_from_doc} from this browser?`)) return;
+      const localPlaces = readJson(LOCAL_PLACES_KEY, []).filter((item) => item.id !== selectedId);
+      localStorage.setItem(LOCAL_PLACES_KEY, JSON.stringify(localPlaces));
+      routes.forEach((route) => { route.stops = route.stops.filter((id) => id !== selectedId); });
+      saveRoutes();
+      location.reload();
+    }
+
+    function clearSelection() {
+      selectedId = null;
+      ui.detail.hidden = true;
+      document.querySelectorAll(".place[aria-pressed]").forEach((el) => el.setAttribute("aria-pressed", "false"));
+      markers.forEach(({ element, shell }) => {
+        element.classList.remove("is-selected");
+        shell.style.zIndex = "100";
+      });
+    }
+
+    function selectRestaurant(id, moveMap) {
+      const r = RESTAURANTS.find((item) => item.id === String(id));
+      if (!r || !hasCoordinates(r)) return;
+      selectedId = r.id;
+      showDetails(r);
+      document.querySelectorAll(".place[aria-pressed]").forEach((el) => el.setAttribute("aria-pressed", String(el.dataset.id === r.id)));
+      markers.forEach(({ element, shell }, markerId) => {
+        const active = markerId === r.id;
+        element.classList.toggle("is-selected", active);
+        shell.style.zIndex = active ? "200" : "100";
+      });
+      if (moveMap) {
+        const marker = markers.get(r.id);
+        if (marker && map) map.easeTo({ center: [marker.lng, marker.lat], zoom: 16, duration: 450 });
+      }
+    }
+
+    function updateMapMarkers(visibleIds) {
+      markers.forEach((marker, id) => {
+        marker.visible = visibleIds.has(id);
+        if (marker.visible && map && !marker.onMap) {
+          marker.mapMarker.addTo(map);
+          marker.onMap = true;
+        } else if (!marker.visible && marker.onMap) {
+          marker.mapMarker.remove();
+          marker.onMap = false;
+        }
+      });
+      if (markers.size) fitVisibleMarkers();
+    }
+
+    function transformLatitude(x, y) {
+      const pi = Math.PI;
+      let value = -100 + (2 * x) + (3 * y) + (0.2 * y * y) + (0.1 * x * y) + (0.2 * Math.sqrt(Math.abs(x)));
+      value += ((20 * Math.sin(6 * x * pi)) + (20 * Math.sin(2 * x * pi))) * 2 / 3;
+      value += ((20 * Math.sin(y * pi)) + (40 * Math.sin(y / 3 * pi))) * 2 / 3;
+      value += ((160 * Math.sin(y / 12 * pi)) + (320 * Math.sin(y * pi / 30))) * 2 / 3;
+      return value;
+    }
+
+    function transformLongitude(x, y) {
+      const pi = Math.PI;
+      let value = 300 + x + (2 * y) + (0.1 * x * x) + (0.1 * x * y) + (0.1 * Math.sqrt(Math.abs(x)));
+      value += ((20 * Math.sin(6 * x * pi)) + (20 * Math.sin(2 * x * pi))) * 2 / 3;
+      value += ((20 * Math.sin(x * pi)) + (40 * Math.sin(x / 3 * pi))) * 2 / 3;
+      value += ((150 * Math.sin(x / 12 * pi)) + (300 * Math.sin(x / 30 * pi))) * 2 / 3;
+      return value;
+    }
+
+    function gcj02ToWgs84(lng, lat) {
+      if (lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271) return [lng, lat];
+      const pi = Math.PI;
+      const axis = 6378245;
+      const eccentricity = 0.006693421622965943;
+      let deltaLat = transformLatitude(lng - 105, lat - 35);
+      let deltaLng = transformLongitude(lng - 105, lat - 35);
+      const radLat = lat / 180 * pi;
+      let magic = Math.sin(radLat);
+      magic = 1 - eccentricity * magic * magic;
+      const sqrtMagic = Math.sqrt(magic);
+      deltaLat = (deltaLat * 180) / ((axis * (1 - eccentricity) / (magic * sqrtMagic)) * pi);
+      deltaLng = (deltaLng * 180) / ((axis / sqrtMagic * Math.cos(radLat)) * pi);
+      const gcjLng = lng + deltaLng;
+      const gcjLat = lat + deltaLat;
+      return [(lng * 2) - gcjLng, (lat * 2) - gcjLat];
+    }
+
+    function fitVisibleMarkers() {
+      if (!map) return;
+      const visible = [...markers.values()].filter((marker) => marker.visible);
+      if (!visible.length) return;
+      const bounds = new MapLibreApi.LngLatBounds();
+      visible.forEach((marker) => bounds.extend([marker.lng, marker.lat]));
+      map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration: 0 });
+    }
+
+    function createRestaurantMarkers() {
+      RESTAURANTS.filter(hasCoordinates).forEach((r) => {
+        const rawLng = Number(r.longitude_gcj02);
+        const rawLat = Number(r.latitude_gcj02);
+        const [lng, lat] = r.coordinate_system === "WGS84" ? [rawLng, rawLat] : gcj02ToWgs84(rawLng, rawLat);
+        const shell = document.createElement("div");
+        shell.className = "marker-shell";
+        const element = document.createElement("button");
+        element.type = "button";
+        element.className = "marker-pin";
+        element.dataset.placeType = placeTypeKey(r);
+        element.setAttribute("aria-label", `Marker ${r.id}: ${r.restaurant_from_doc}`);
+        const number = document.createElement("span");
+        number.textContent = r.id;
+        element.append(number);
+        shell.append(element);
+        element.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (mobileLayout.matches) openMobilePanel("search");
+          selectRestaurant(r.id, true);
+          if (mobileLayout.matches) {
+            window.setTimeout(() => ui.detail.scrollIntoView({ behavior: "smooth", block: "start" }), 280);
+          } else {
+            document.querySelector(`.place[data-id="${r.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        });
+        const mapMarker = new MapLibreApi.Marker({ element: shell, anchor: "bottom" }).setLngLat([lng, lat]);
+        markers.set(r.id, { mapMarker, element, shell, lat, lng, visible: true, onMap: false });
+      });
+      updateMapMarkers(new Set(currentMatches().filter(hasCoordinates).map((r) => r.id)));
+    }
+
+    async function initializeMap() {
+      if (!CAN_REQUEST_TILES) {
+        ui.tileMessage.classList.add("setup-message");
+        ui.tileMessage.textContent = "Map tiles are paused because this file was opened directly. Run python3 -m http.server 8000 in the website folder, then visit http://localhost:8000.";
+        ui.tileMessage.hidden = false;
+        return;
+      }
+      try {
+        MapLibreApi = await import(MAPLIBRE_MODULE_URL);
+        map = new MapLibreApi.Map({
+          container: "map",
+          style: OPENFREEMAP_STYLE_URL,
+          center: gcj02ToWgs84(121.4737, 31.2304),
+          zoom: 12,
+          maxZoom: 18,
+          attributionControl: true
+        });
+        map.on("load", () => {
+          ui.tileMessage.hidden = true;
+          map.addSource("trip-route", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } } });
+          map.addLayer({ id: "trip-route-shadow", type: "line", source: "trip-route", paint: { "line-color": "#fffdf8", "line-width": 9, "line-opacity": .9 } });
+          map.addLayer({ id: "trip-route-line", type: "line", source: "trip-route", paint: { "line-color": "#176b5b", "line-width": 5, "line-opacity": .95, "line-dasharray": [1.4, .8] } });
+          createRestaurantMarkers();
+          renderRoute();
+          fitVisibleMarkers();
+        });
+        ui.map.addEventListener("keydown", (event) => {
+          const pans = { ArrowLeft: [-80, 0], ArrowRight: [80, 0], ArrowUp: [0, -80], ArrowDown: [0, 80] };
+          if (pans[event.key]) {
+            event.preventDefault();
+            map.panBy(pans[event.key], { duration: 200 });
+          } else if (event.key === "+" || event.key === "=") {
+            event.preventDefault();
+            map.zoomIn();
+          } else if (event.key === "-") {
+            event.preventDefault();
+            map.zoomOut();
+          }
+        });
+        ui.zoomIn.addEventListener("click", () => map.zoomIn());
+        ui.zoomOut.addEventListener("click", () => map.zoomOut());
+        ui.fitMap.addEventListener("click", fitVisibleMarkers);
+      } catch (error) {
+        console.error("Map initialization failed:", error);
+        ui.tileMessage.textContent = "The free basemap could not load. Check your internet connection, then refresh. The place list and Amap source links still work.";
+        ui.tileMessage.hidden = false;
+      }
+    }
+
+    function populateCategories() {
+      ui.category.replaceChildren(new Option("All categories", ""));
+      ui.restaurantTypes.replaceChildren();
+      [...new Set(RESTAURANTS.map((r) => r.type_from_doc).filter(Boolean))].sort((a, b) => a.localeCompare(b)).forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        ui.category.append(option);
+        const suggestion = document.createElement("option");
+        suggestion.value = category;
+        ui.restaurantTypes.append(suggestion);
+      });
+    }
+
+    function syncCategoryField() {
+      const trainStation = ui.addPlaceType.value === "Train Station";
+      ui.addCategory.hidden = trainStation;
+      ui.addCategory.disabled = trainStation;
+      ui.addCategory.required = !trainStation;
+      ui.addTrainCategory.hidden = !trainStation;
+      ui.addTrainCategory.disabled = !trainStation;
+      ui.addTrainCategory.required = trainStation;
+      ui.addCategoryLabel.htmlFor = trainStation ? "add-train-category" : "add-category";
+      ui.addCategoryLabel.textContent = trainStation ? "Train category *" : "Category or description *";
+      ui.addCategoryHint.hidden = !trainStation;
+    }
+
+    function setFormStatus(message, kind = "") {
+      ui.formStatus.textContent = message;
+      ui.formStatus.className = `form-status${kind ? ` ${kind}` : ""}`;
+    }
+
+    function openRestaurantForm() {
+      setFormStatus("");
+      syncCategoryField();
+      ui.submitRestaurant.disabled = false;
+      ui.submitRestaurant.textContent = "Save as Pending";
+      if (mobileLayout.matches) {
+        closeMobilePanel();
+        ui.mobileDock.classList.remove("map-only");
+        ui.mobileMapAction.querySelector(".mobile-nav-label").textContent = "Map";
+        setMobileActionState("add");
+      }
+      if (typeof ui.addDialog.showModal === "function") ui.addDialog.showModal();
+      document.getElementById("add-name").focus();
+    }
+
+    function closeRestaurantForm() {
+      if (ui.addDialog.open) ui.addDialog.close();
+      if (mobileLayout.matches) setMobileActionState("");
+    }
+
+    function setSyncStatus(message, kind = "") {
+      ui.syncStatus.textContent = message;
+      ui.syncStatus.className = `form-status${kind ? ` ${kind}` : ""}`;
+    }
+
+    function openSyncForm() {
+      setSyncStatus("");
+      ui.startSync.disabled = false;
+      ui.startSync.textContent = "Start research now";
+      if (typeof ui.syncDialog.showModal === "function") ui.syncDialog.showModal();
+      document.getElementById("sync-passcode").focus();
+    }
+
+    function closeSyncForm() {
+      if (ui.syncDialog.open) ui.syncDialog.close();
+    }
+
+    async function submitRestaurant(event) {
+      event.preventDefault();
+      if (!ui.restaurantForm.reportValidity()) return;
+      const formData = new FormData(ui.restaurantForm);
+      const payload = Object.fromEntries(formData.entries());
+      ui.submitRestaurant.disabled = true;
+      ui.submitRestaurant.textContent = "Saving…";
+      setFormStatus("Saving securely to the private Sheet…");
+      try {
+        requireDataApi();
+        const response = await fetch(DATA_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
+          body: JSON.stringify(payload),
+          redirect: "follow"
+        });
+        if (!response.ok) throw new Error(`Submission service returned ${response.status}.`);
+        const result = await response.json();
+        if (!result.ok) throw new Error(result.error || "The place could not be saved.");
+        const duplicate = result.status === "already_pending";
+        setFormStatus(duplicate ? "This place is already waiting in the research queue." : "Saved as Pending. Use Research pending now, or let the nightly job handle it.", "success");
+        ui.submitRestaurant.textContent = duplicate ? "Already Pending" : "Saved as Pending";
+        if (!duplicate) {
+          ui.restaurantForm.reset();
+          syncCategoryField();
+        }
+      } catch (error) {
+        console.warn("Place submission was not accepted:", error.message || error);
+        setFormStatus(error.message || "The place could not be saved. Please try again.", "error");
+        ui.submitRestaurant.disabled = false;
+        ui.submitRestaurant.textContent = "Try again";
+      }
+    }
+
+    async function migrateLocalPlacesToQueue() {
+      const localPlaces = readJson(LOCAL_PLACES_KEY, []);
+      if (!Array.isArray(localPlaces) || !localPlaces.length) return 0;
+      const remaining = [];
+      let migrated = 0;
+      requireDataApi();
+      for (const place of localPlaces) {
+        const payload = {
+          name: place.restaurant_from_doc,
+          placeType: placeType(place),
+          category: place.type_from_doc || placeType(place),
+          areaBranch: place.area || "",
+          mapLink: place.amap_url || "",
+          latitude: place.latitude_gcj02 || "",
+          longitude: place.longitude_gcj02 || "",
+          coordinateSystem: place.coordinate_system || "GCJ-02",
+          note: place.match_note || "Migrated from the localhost prototype",
+          website: ""
+        };
+        try {
+          const response = await fetch(DATA_API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: JSON.stringify(payload), redirect: "follow" });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw new Error(result.error || `Submission service returned ${response.status}.`);
+          migrated += 1;
+        } catch (error) {
+          remaining.push(place);
+        }
+      }
+      localStorage.setItem(LOCAL_PLACES_KEY, JSON.stringify(remaining));
+      if (remaining.length) throw new Error(`${remaining.length} local place${remaining.length === 1 ? "" : "s"} could not be moved to the research queue.`);
+      return migrated;
+    }
+
+    async function startImmediateResearch(event) {
+      event.preventDefault();
+      if (!ui.syncForm.reportValidity()) return;
+      const formData = new FormData(ui.syncForm);
+      const payload = { action: "enrich_now", passcode: formData.get("passcode"), website: "" };
+      ui.startSync.disabled = true;
+      ui.startSync.textContent = "Starting…";
+      setSyncStatus("Checking the Pending queue…");
+      try {
+        requireDataApi();
+        const migrated = await migrateLocalPlacesToQueue();
+        if (migrated) setSyncStatus(`Moved ${migrated} local place${migrated === 1 ? "" : "s"} into the private queue. Starting research…`);
+        const response = await fetch(DATA_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
+          body: JSON.stringify(payload),
+          redirect: "follow"
+        });
+        if (!response.ok) throw new Error(`Research service returned ${response.status}.`);
+        const result = await response.json();
+        if (!result.ok) throw new Error(result.error || "Research could not be started.");
+        setSyncStatus(result.message || "Place research has started.", "success");
+        ui.startSync.textContent = result.queued ? "Research started" : "Nothing pending";
+        ui.syncForm.reset();
+      } catch (error) {
+        console.warn("Immediate place research was not started:", error.message || error);
+        setSyncStatus(error.message || "Research could not be started. Please try again.", "error");
+        ui.startSync.disabled = false;
+        ui.startSync.textContent = "Try again";
+      }
+    }
+
+    ui.openAdd.addEventListener("click", openRestaurantForm);
+    ui.closeAdd.addEventListener("click", closeRestaurantForm);
+    ui.addDialog.addEventListener("close", () => {
+      if (mobileLayout.matches) setMobileActionState("");
+    });
+    ui.addDialog.addEventListener("click", (event) => {
+      if (event.target === ui.addDialog) closeRestaurantForm();
+    });
+    ui.mobileMapAction.addEventListener("click", toggleMobileMapMode);
+    ui.mobileFindAction.addEventListener("click", () => openMobilePanel("search"));
+    ui.mobileAddAction.addEventListener("click", openRestaurantForm);
+    ui.mobileRouteAction.addEventListener("click", () => openMobilePanel("route"));
+    ui.mobileSheetClose.addEventListener("click", closeMobilePanel);
+    mobileLayout.addEventListener("change", resetMobileLayout);
+    ui.restaurantForm.addEventListener("submit", submitRestaurant);
+    ui.addPlaceType.addEventListener("change", syncCategoryField);
+    ui.openSync.addEventListener("click", openSyncForm);
+    ui.closeSync.addEventListener("click", closeSyncForm);
+    ui.syncDialog.addEventListener("click", (event) => {
+      if (event.target === ui.syncDialog) closeSyncForm();
+    });
+    ui.syncForm.addEventListener("submit", startImmediateResearch);
+    ui.search.addEventListener("input", renderList);
+    ui.category.addEventListener("change", renderList);
+    ui.placeTypeOptions.forEach((option) => option.addEventListener("change", () => {
+      updatePlaceTypeSummary();
+      renderList();
+    }));
+    ui.placeTypeClear.addEventListener("click", () => {
+      clearPlaceTypeFilters();
+      renderList();
+    });
+    document.addEventListener("click", (event) => {
+      if (!ui.placeTypeFilter.contains(event.target)) ui.placeTypePicker.open = false;
+    });
+    ui.addToRoute.addEventListener("click", addSelectedToRoute);
+    ui.deleteLocalPlace.addEventListener("click", deleteSelectedLocalPlace);
+    ui.newRoute.addEventListener("click", createRouteList);
+    ui.renameRoute.addEventListener("click", renameRouteList);
+    ui.saveRouteOnline.addEventListener("click", saveSharedRoutes);
+    ui.refreshSharedRoutes.addEventListener("click", () => loadSharedRoutes({ force: true }));
+    ui.routeSelect.addEventListener("change", () => {
+      activeRouteId = ui.routeSelect.value;
+      renderRoute();
+    });
+    ui.detailRouteSelect.addEventListener("change", () => {
+      activeRouteId = ui.detailRouteSelect.value;
+      renderRoute();
+    });
+    ui.reset.addEventListener("click", () => {
+      ui.search.value = "";
+      ui.category.value = "";
+      clearPlaceTypeFilters();
+      clearSelection();
+      renderList();
+      ui.search.focus();
+    });
+
+    async function startApp() {
+      const dataSource = await loadRestaurantData();
+      mergeLocalPlaces();
+      await loadSharedRoutes();
+      populateCategories();
+      updateDataStatus(dataSource);
+      renderRoute();
+      renderList();
+      initializeMap();
+
+      // Small read-only test surface for automated checks; no credentials.
+      window.SHANGHAI_MAP_TEST = Object.freeze({ RESTAURANTS, FALLBACK_RESTAURANTS, DATA_API_URL, hasCoordinates, safeAmapUrl, currentMatches, markers, CAN_REQUEST_TILES, dataSource });
+    }
+
+    startApp();
+  </script>
+</body>
+</html>
